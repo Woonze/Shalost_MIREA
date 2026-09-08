@@ -28,11 +28,25 @@ DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Shalost"
 CHROME_PROFILE = DATA_DIR / "pulse-chrome-profile"
 SETTINGS_PATH = DATA_DIR / "settings.json"
 RUN_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
-LOG_PATH = RUN_DIR / "pulseqr.log"
 BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", RUN_DIR))
 QR_IMAGE = BUNDLE_DIR / "assets" / "cloudtips-donation-qr.png"
 APP_ICON = BUNDLE_DIR / "assets" / "shalost-fotur.ico"
 APP_ICON_PNG = BUNDLE_DIR / "assets" / "shalost-fotur.png"
+
+
+def log_path() -> Path:
+    candidate = RUN_DIR / "pulseqr.log"
+    try:
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        with candidate.open("a", encoding="utf-8"):
+            pass
+        return candidate
+    except OSError:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        return DATA_DIR / "pulseqr.log"
+
+
+LOG_PATH = log_path()
 
 STATE_JS = """() => {
   const settingsLinks = [...document.querySelectorAll('a[href*="/settings"]')];
