@@ -1,0 +1,54 @@
+name: Build Windows application
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt pyinstaller
+      - name: Build portable application
+        run: pyinstaller --noconfirm --clean --onedir --windowed --exclude-module numpy --icon assets/shalost-fotur.ico --add-data "assets/cloudtips-donation-qr.png;assets" --add-data "assets/shalost-fotur.ico;assets" --add-data "assets/shalost-fotur.png;assets" --name Shalost-FOTUR main.py
+      - name: Package portable edition
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path releases
+          Compress-Archive -Path dist/Shalost-FOTUR/* -DestinationPath releases/Shalost-FOTUR-portable.zip
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build installer edition
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v(.+)$") {
+            $version = $Matches[1]
+          } else {
+            $version = "0.1.0"
+          }
+          iscc "/DMyAppVersion=$version" installer.iss
+      - name: Upload release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shalost-FOTUR-Windows
+          path: |
+            releases/Shalost-FOTUR-portable.zip
+            releases/Shalost-FOTUR-Setup-*.exe
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            releases/Shalost-FOTUR-portable.zip
+            releases/Shalost-FOTUR-Setup-*.exe

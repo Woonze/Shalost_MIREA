@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Демонстрация контроля присутствия</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 980px; min-height: 620px; overflow: hidden; font-family: Arial, sans-serif; background: #12151c; color: #eef2f8; }
+    .topbar { height: 58px; background: #272b34; padding: 11px 18px; display: flex; align-items: center; gap: 18px; color: #d5d9e1; font-size: 13px; }
+    .timer { color: #ddd; font-size: 17px; }
+    .course { font-size: 16px; color: #b8bec8; }
+    .leave { margin-left: auto; color: #c3c6ce; font-size: 12px; }
+    .layout { height: calc(100vh - 58px); display: grid; grid-template-columns: minmax(650px, 1fr) 340px; }
+    .stage { position: relative; background: #000; display: grid; place-items: center; overflow: hidden; }
+    .slides { width: 72%; aspect-ratio: 16 / 9; background: #fbfbfb; color: #191919; padding: 7% 8%; position: relative; box-shadow: 0 2px 18px #000; }
+    .slides::before { content: "2. Виды ИОС"; position: absolute; left: 9%; top: 38%; font-size: clamp(32px, 4vw, 70px); white-space: nowrap; font-family: Georgia, serif; }
+    .slides::after { content: "МИРЭА · РТУ"; position: absolute; bottom: 7%; left: 8%; color: #63a9a3; letter-spacing: 8px; font-size: clamp(19px, 2.4vw, 40px); }
+    .side { background: #34363c; padding: 12px; position: relative; }
+    .camera { height: 180px; background: linear-gradient(135deg, #5b4c43, #1e2027); border-radius: 3px; margin: 0 auto 18px; position: relative; overflow: hidden; }
+    .camera::after { content: "Участник"; position: absolute; bottom: 9px; left: 10px; color: white; text-shadow: 0 1px 2px #000; font-size: 13px; }
+    .chat { display: flex; flex-direction: column; gap: 8px; }
+    .message { max-width: 80%; align-self: flex-start; background: #202226; border-radius: 8px; padding: 8px 10px; color: #f0f0f0; font-size: 13px; line-height: 1.25; }
+    .message:nth-child(even) { align-self: flex-end; background: #4b8e8a; }
+    .write { position: absolute; bottom: 12px; left: 12px; right: 12px; color: #aaa; background: #292b30; border-radius: 20px; padding: 11px 14px; font-size: 13px; }
+    .backdrop { position: fixed; inset: 0; display: none; place-items: center; background: rgba(0, 0, 0, .59); z-index: 5; }
+    .backdrop.visible { display: grid; }
+    .dialog { width: 335px; background: #fff; color: #333; box-shadow: 0 3px 12px rgba(0, 0, 0, .45); padding: 18px 18px 12px; }
+    .dialog h1 { margin: 0 0 20px; font-size: 16px; font-weight: 600; }
+    .flag { width: 72px; height: 82px; border: 2px solid #2a2a2a; margin: 0 auto 24px; position: relative; }
+    .flag::before { content: ""; position: absolute; width: 3px; height: 78px; background: #333; left: 22px; top: -4px; transform: rotate(15deg); transform-origin: bottom; }
+    .flag::after { content: ""; position: absolute; width: 39px; height: 21px; background: #ffbd12; left: 26px; top: 6px; transform: skewY(-12deg); box-shadow: -7px 16px 0 -7px #f05b21; }
+    .dialog p { font-size: 13px; line-height: 1.4; margin: 0 0 18px; max-width: 250px; }
+    .actions { display: flex; align-items: center; justify-content: space-between; }
+    #seconds { color: #666; font-size: 13px; }
+    button { border: 0; background: #a900ff; color: #fff; padding: 8px 13px; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px #aaa; }
+    .notice { position: fixed; left: 16px; bottom: 16px; color: #cad0db; font-size: 12px; opacity: .75; z-index: 6; }
+  </style>
+</head>
+<body>
+  <header class="topbar"><span class="timer">01:32:27</span><span class="course">РТУ МИРЭА   04.09.2026 12:40 ЛК. Сопровождение программных систем</span><span class="leave">ВЫЙТИ ИЗ ЭФИРА</span></header>
+  <main class="layout">
+    <section class="stage"><div class="slides"></div></section>
+    <aside class="side"><div class="camera"></div><div class="chat"><div class="message">интересно, нам на первом курсе точно давали определение информации по информатике</div><div class="message">наверное из других областей</div><div class="message">математика определение прямо к сожалению не дает :(</div></div><div class="write">Введите сообщение</div></aside>
+  </main>
+  <div class="backdrop" id="presenceDialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <div class="dialog"><h1 id="dialogTitle">Контроль присутствия</h1><div class="flag" aria-hidden="true"></div><p>Подтвердите, что вы участвуете в онлайн-мероприятии</p><div class="actions"><span id="seconds">02:52</span><button id="confirm">ПОДТВЕРЖДАЮ</button></div></div>
+  </div>
+  <div class="notice" id="notice">Уведомление появится через 15 секунд</div>
+  <script>
+    const modal = document.getElementById('presenceDialog');
+    const notice = document.getElementById('notice');
+    setTimeout(() => { modal.classList.add('visible'); notice.textContent = 'Появилось уведомление контроля присутствия'; }, 15000);
+    document.getElementById('confirm').addEventListener('click', () => { modal.classList.remove('visible'); notice.textContent = 'Присутствие подтверждено'; });
+  </script>
+</body>
+</html>

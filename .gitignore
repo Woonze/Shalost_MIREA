@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Build output
+build/
+dist/
+build-*/
+diagnostic/
+release/
+*.spec
+*.exe
+
+# Local application data and secrets
+*.log
+pulseqr-settings.json
+.env
+.env.*
+
+# IDE and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
