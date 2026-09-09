@@ -134,7 +134,6 @@ class App:
         self.browser_busy = False
         self.account = ""
         self.last_success = 0.0
-        self.last_presence_click = 0.0
         self.root = tk.Tk()
         self.root.title(APP_NAME)
         self.root.geometry("760x670")
@@ -457,40 +456,43 @@ class App:
             self.post("scan", False)
             return
         previous = ""
+        presence_pending = False
         while self.scanning and not self.stop.is_set():
             try:
-                if time.time() - self.last_success < int(self.settings["cooldown_minutes"]) * 60:
-                    self.post("status", "Пауза после подтверждения")
-                    self.stop.wait(2)
-                    continue
                 screenshot = ImageGrab.grab(all_screens=True)
-                if time.time() - self.last_presence_click >= 30:
-                    presence_button = self.find_presence_button(screenshot)
-                    if presence_button:
-                        self.click_screen_point(*presence_button)
-                        self.last_presence_click = time.time()
-                        self.log("PRESENCE", "Найдено окно контроля присутствия. Нажата «ПОДТВЕРЖДАЮ»")
-                        self.post("status", "Присутствие в онлайн-мероприятии подтверждено")
-                        self.stop.wait(1)
-                        continue
-                codes = zxingcpp.read_barcodes(screenshot)
-                token = None
-                for code in codes:
-                    token = qr_token(code.text)
-                    if token:
-                        break
-                if token and token != previous:
-                    previous = token
-                    self.log("SCAN", "Найден QR Pulse. Отправляю запрос")
-                    self.post("status", "Найден QR — подтверждаю…")
-                    ok, detail = self.approve(token)
-                    if ok:
-                        self.last_success = time.time()
-                        self.log("PULSE", "Посещение подтверждено")
-                        self.post("status", "Посещение подтверждено")
-                    else:
-                        self.log("PULSE", "Подтверждение отклонено: " + detail)
-                        self.post("status", "Ошибка Pulse: " + detail)
+                presence_button = self.find_presence_button(screenshot)
+                presence_activity = bool(presence_button)
+                if presence_button:
+                    self.click_screen_point(*presence_button)
+                    presence_pending = True
+                    self.post("status", "Подтверждаю присутствие в MTS Link…")
+                elif presence_pending:
+                    presence_pending = False
+                    presence_activity = True
+                    self.log("PRESENCE", "Присутствие в онлайн-мероприятии подтверждено")
+                    self.post("status", "Присутствие в онлайн-мероприятии подтверждено")
+
+                if time.time() - self.last_success >= int(self.settings["cooldown_minutes"]) * 60:
+                    codes = zxingcpp.read_barcodes(screenshot)
+                    token = None
+                    for code in codes:
+                        token = qr_token(code.text)
+                        if token:
+                            break
+                    if token and token != previous:
+                        previous = token
+                        self.log("SCAN", "Найден QR Pulse. Отправляю запрос")
+                        self.post("status", "Найден QR — подтверждаю…")
+                        ok, detail = self.approve(token)
+                        if ok:
+                            self.last_success = time.time()
+                            self.log("PULSE", "Посещение подтверждено")
+                            self.post("status", "Посещение подтверждено")
+                        else:
+                            self.log("PULSE", "Подтверждение отклонено: " + detail)
+                            self.post("status", "Ошибка Pulse: " + detail)
+                elif not presence_activity:
+                    self.post("status", "Пауза после подтверждения QR")
                 self.stop.wait(2)
             except Exception as exc:
                 LOGGER.exception("Scanner failure")
