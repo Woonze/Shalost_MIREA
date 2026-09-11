@@ -455,7 +455,8 @@ class App:
             self.scanning = False
             self.post("scan", False)
             return
-        previous = ""
+        current_token = ""
+        qr_successes = 0
         presence_pending = False
         while self.scanning and not self.stop.is_set():
             try:
@@ -479,15 +480,23 @@ class App:
                         token = qr_token(code.text)
                         if token:
                             break
-                    if token and token != previous:
-                        previous = token
-                        self.log("SCAN", "Найден QR Pulse. Отправляю запрос")
-                        self.post("status", "Найден QR — подтверждаю…")
+                    if token:
+                        if token != current_token:
+                            current_token = token
+                            qr_successes = 0
+                        attempt = qr_successes + 1
+                        self.log("SCAN", f"Найден QR Pulse. Попытка {attempt}/3")
+                        self.post("status", f"Найден QR — попытка {attempt}/3…")
                         ok, detail = self.approve(token)
                         if ok:
-                            self.last_success = time.time()
-                            self.log("PULSE", "Посещение подтверждено")
-                            self.post("status", "Посещение подтверждено")
+                            qr_successes += 1
+                            if qr_successes == 3:
+                                self.last_success = time.time()
+                                self.log("PULSE", "Посещение подтверждено: 3/3. Включена пауза QR")
+                                self.post("status", "Посещение подтверждено: 3/3")
+                            else:
+                                self.log("PULSE", f"Посещение подтверждено: {qr_successes}/3")
+                                self.post("status", f"Посещение подтверждено: {qr_successes}/3")
                         else:
                             self.log("PULSE", "Подтверждение отклонено: " + detail)
                             self.post("status", "Ошибка Pulse: " + detail)
