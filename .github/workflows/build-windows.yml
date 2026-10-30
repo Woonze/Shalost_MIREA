@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt pyinstaller
       - name: Build portable application
-        run: pyinstaller --noconfirm --clean --onedir --windowed --exclude-module numpy --icon assets/shalost-fotur.ico --add-data "assets/cloudtips-donation-qr.png;assets" --add-data "assets/shalost-fotur.ico;assets" --add-data "assets/shalost-fotur.png;assets" --name Shalost-FOTUR main.py
+        run: pyinstaller --noconfirm --clean --onedir --windowed --exclude-module numpy --icon assets/shalost-fotur.ico --add-data "assets/cloudtips-donation-qr.png;assets" --add-data "assets/shalost-fotur.ico;assets" --add-data "assets/shalost-fotur.png;assets" --add-data "extension;extension" --name Shalost-FOTUR main.py
       - name: Package portable edition
         shell: pwsh
         run: |

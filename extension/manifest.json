@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Shalost FOTUR — фоновая вкладка",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "permissions": ["activeTab", "tabCapture", "offscreen", "storage", "scripting"],
+  "host_permissions": ["http://127.0.0.1:47881/*", "https://my.mts-link.ru/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "Shalost FOTUR"}
+}
