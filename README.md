@@ -65,7 +65,7 @@ Cookie вручную копировать не нужно. Если Chrome ил
     python -m pip install -r requirements.txt pyinstaller
     pyinstaller --noconfirm --clean --onedir --windowed --exclude-module numpy --icon assets/shalost-fotur.ico --add-data "assets/cloudtips-donation-qr.png;assets" --add-data "assets/shalost-fotur.ico;assets" --add-data "assets/shalost-fotur.png;assets" --add-data "extension;extension" --name Shalost-FOTUR main.py
 
-Готовая portable-папка появится в dist\Shalost-FOTUR. Сценарий GitHub Actions автоматически создаёт и portable ZIP, и обычный установщик после push тега вида v0.1.0.
+Готовая portable-папка появится в dist\Shalost-FOTUR. Сценарий GitHub Actions автоматически создаёт portable ZIP и обычный установщик после push тега релиза, например `v0.2.1`.
 
 ## Проверка перед релизом
 

@@ -747,34 +747,34 @@ class App:
                 ctx = p.chromium.launch_persistent_context(str(self.account_path(account_id)), channel="chrome", headless=False)
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
                 page.goto(PULSE_HOME, wait_until="domcontentloaded", timeout=60000)
-                stable_name = ""
-                stable_since = 0.0
+                session_since = 0.0
                 for _ in range(600):
                     if self.stop.wait(1):
                         break
-                    try:
-                        state = page.evaluate(STATE_JS)
-                        name = str(state.get("name", "")).strip()
-                        cookies = ctx.cookies(PULSE_HOME)
-                        authenticated = any(cookie["name"] == ".AspNetCore.Cookies" and cookie["value"] for cookie in cookies)
-                        if name and state.get("onPulse") and authenticated:
-                            if name != stable_name:
-                                stable_name = name
-                                stable_since = time.monotonic()
-                            if time.monotonic() - stable_since < 5:
-                                continue
-                            ctx.close()
-                            self.post("account_added", {"id": account_id, "name": name})
-                            self.post("status", "Сессия активна")
-                            self.log("AUTH", f"Вход завершён: {name}.")
-                            return
-                        stable_name = ""
-                        stable_since = 0.0
-                    except PlaywrightError:
-                        if page.is_closed():
-                            break
-                        stable_name = ""
-                        stable_since = 0.0
+                    pages = [candidate for candidate in ctx.pages if not candidate.is_closed()]
+                    cookies = ctx.cookies(PULSE_HOME)
+                    authenticated = any(cookie["name"] == ".AspNetCore.Cookies" and cookie["value"] for cookie in cookies)
+                    pulse_name = ""
+                    for candidate in pages:
+                        try:
+                            state = candidate.evaluate(STATE_JS)
+                            if state.get("onPulse") and state.get("name"):
+                                pulse_name = str(state["name"]).strip()
+                        except PlaywrightError:
+                            continue
+
+                    if authenticated:
+                        if not session_since:
+                            session_since = time.monotonic()
+                        if time.monotonic() - session_since < 5:
+                            continue
+                        name = pulse_name or f"Аккаунт {len(self.accounts) + 1}"
+                        ctx.close()
+                        self.post("account_added", {"id": account_id, "name": name})
+                        self.post("status", "Сессия активна")
+                        self.log("AUTH", f"Вход завершён: {name}.")
+                        return
+                    session_since = 0.0
                 ctx.close()
                 self.post("status", "Вход не подтверждён — откройте Pulse ещё раз")
                 self.log("AUTH", "Окно входа закрыто до подтверждения сессии")
