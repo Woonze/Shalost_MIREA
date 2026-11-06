@@ -122,7 +122,17 @@ STATE_JS = """() => {
   const settingsLinks = [...document.querySelectorAll('a[href*="/settings"]')];
   const values = settingsLinks.map(x => (x.innerText || '').trim())
     .filter(x => x && !/настройки|settings/i.test(x));
-  return {onPulse: location.hostname === 'pulse.mirea.ru', name: values.at(-1) || ''};
+  const namePattern = /^[А-ЯЁ][а-яё-]+(?:\\s+[А-ЯЁ][а-яё-]+)*\\s+[А-ЯЁ]\\.\\s*[А-ЯЁ]\\.?$/;
+  const accountName = [...document.querySelectorAll('a, button, [role="button"]')]
+    .map(x => (x.innerText || '').trim())
+    .find(x => namePattern.test(x)) || '';
+  const pageText = document.body?.innerText || '';
+  const hasLoginForm = [...document.querySelectorAll('input')].some(x =>
+    !x.disabled && x.getClientRects().length > 0 && getComputedStyle(x).visibility !== 'hidden' &&
+    /password|email|login|username/i.test(`${x.type} ${x.name} ${x.autocomplete}`)
+  );
+  const authenticatedUI = Boolean(accountName && pageText.includes('Мои занятия') && pageText.includes('Сервисы') && !hasLoginForm);
+  return {onPulse: location.hostname === 'pulse.mirea.ru', name: values.at(-1) || accountName, authenticatedUI};
 }"""
 
 
@@ -753,16 +763,20 @@ class App:
                         break
                     pages = [candidate for candidate in ctx.pages if not candidate.is_closed()]
                     cookies = ctx.cookies(PULSE_HOME)
-                    authenticated = any(cookie["name"] == ".AspNetCore.Cookies" and cookie["value"] for cookie in cookies)
+                    cookie_auth = any(cookie["name"] == ".AspNetCore.Cookies" and cookie["value"] for cookie in cookies)
+                    ui_auth = False
                     pulse_name = ""
                     for candidate in pages:
                         try:
                             state = candidate.evaluate(STATE_JS)
-                            if state.get("onPulse") and state.get("name"):
-                                pulse_name = str(state["name"]).strip()
+                            if state.get("onPulse"):
+                                ui_auth = ui_auth or bool(state.get("authenticatedUI"))
+                                if state.get("name"):
+                                    pulse_name = str(state["name"]).strip()
                         except PlaywrightError:
                             continue
 
+                    authenticated = cookie_auth or ui_auth
                     if authenticated:
                         if not session_since:
                             session_since = time.monotonic()
