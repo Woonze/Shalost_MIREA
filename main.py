@@ -434,7 +434,8 @@ class App:
         actions = tk.Frame(profile, bg=self.CARD)
         actions.pack(anchor="w", pady=(6, 0))
         self.button(actions, text="Добавить аккаунт", command=self.open_login).pack(side="left")
-        self.button(actions, text="Удалить выбранный", style="Danger.TButton", command=self.logout).pack(side="left", padx=8)
+        self.button(actions, text="Войти заново", style="Secondary.TButton", command=self.relogin).pack(side="left", padx=8)
+        self.button(actions, text="Удалить выбранный", style="Danger.TButton", command=self.logout).pack(side="left")
         background = self.card(content)
         self.background_settings = background
         background.pack(fill="x", pady=(10, 0))
@@ -751,7 +752,24 @@ class App:
         self.log("AUTH", "Открыто официальное окно Pulse для входа")
         threading.Thread(target=self.login_worker, args=(account_id,), daemon=True).start()
 
-    def login_worker(self, account_id: str) -> None:
+    def relogin(self) -> None:
+        if self.scan_thread and self.scan_thread.is_alive():
+            self.post("status", "Остановите сканирование перед повторным входом")
+            return
+        if self.browser_busy:
+            self.post("status", "Уже выполняется проверка или вход…")
+            return
+        selected = self.account_list.curselection()
+        if not selected:
+            messagebox.showinfo(APP_NAME, "Выберите аккаунт для повторного входа")
+            return
+        account = self.accounts[selected[0]]
+        self.browser_busy = True
+        self.post("status", "Войдите в выбранный аккаунт Pulse в окне Chrome")
+        self.log("AUTH", f"Повторный вход: {account['name']}")
+        threading.Thread(target=self.login_worker, args=(account["id"], True), daemon=True).start()
+
+    def login_worker(self, account_id: str, reconnect: bool = False) -> None:
         try:
             with sync_playwright() as p:
                 ctx = p.chromium.launch_persistent_context(str(self.account_path(account_id)), channel="chrome", headless=False)
@@ -776,7 +794,8 @@ class App:
                         except PlaywrightError:
                             continue
 
-                    authenticated = cookie_auth or ui_auth
+                    # Старый cookie может сохраниться после истечения сессии.
+                    authenticated = ui_auth if reconnect else (cookie_auth or ui_auth)
                     if authenticated:
                         if not session_since:
                             session_since = time.monotonic()
@@ -784,7 +803,8 @@ class App:
                             continue
                         name = pulse_name or f"Аккаунт {len(self.accounts) + 1}"
                         ctx.close()
-                        self.post("account_added", {"id": account_id, "name": name})
+                        if not reconnect:
+                            self.post("account_added", {"id": account_id, "name": name})
                         self.post("status", "Сессия активна")
                         self.log("AUTH", f"Вход завершён: {name}.")
                         return
@@ -841,6 +861,7 @@ class App:
         partial_successes: dict[str, set[str]] = {}
         qr_successes = 0
         presence_pending = False
+        expired_accounts: set[str] = set()
         while not scan_stop.is_set() and not self.stop.is_set():
             try:
                 screenshot = ImageGrab.grab(all_screens=True)
@@ -882,13 +903,16 @@ class App:
                         for account in list(self.accounts):
                             if scan_stop.is_set() or self.stop.is_set():
                                 break
-                            if account["id"] in completed:
+                            if account["id"] in completed or account["id"] in expired_accounts:
                                 continue
                             ok, detail = self.approve(token, account)
                             if ok:
                                 completed.add(account["id"])
                                 self.log("PULSE", f"{account['name']}: подтверждено")
                             else:
+                                if detail == "HTTP 401":
+                                    expired_accounts.add(account["id"])
+                                    detail = "сессия отклонена (HTTP 401); остановите сканирование и войдите заново в настройках"
                                 self.log("PULSE", f"{account['name']}: ошибка — {detail}")
                         ok = all(account["id"] in completed for account in self.accounts)
                         detail = "не для всех аккаунтов" if not ok else ""
@@ -907,6 +931,12 @@ class App:
                             confirmed_tokens.clear()
                             qr_successes = 0
                             self.log("PULSE", "Подтверждение отклонено: " + detail)
+                            if expired_accounts:
+                                self.post("status", "Сессия отклонена: остановите сканирование и войдите заново в настройках")
+                                # Восстановление входа требует остановленного сканирования.
+                                self.scanning = False
+                                self.post("scan", False)
+                                return
                             self.post("status", "Ошибка Pulse: " + detail)
                 elif not presence_activity:
                     self.post("status", "Пауза после подтверждения QR")
@@ -1003,6 +1033,8 @@ class App:
             grpc_status, grpc_message = grpc_web_trailer(bytes(result.get("bytes", [])))
             if result.get("status") == 200 and grpc_status == "0":
                 return True, ""
+            if result.get("status") == 401:
+                return False, "HTTP 401"
             detail = grpc_message or f"HTTP {result.get('status')}; gRPC {grpc_status or 'не указан'}"
             return False, detail
         except Exception as exc:

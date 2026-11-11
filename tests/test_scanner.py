@@ -55,6 +55,15 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(calls, [(token, "a"), (token, "b"), (token, "b")])
         self.assertEqual(app.last_success, 0)
 
+    def test_unauthorized_stops_scanning_and_identifies_accounts(self):
+        token = str(main.UUID(int=1))
+        app, calls, logs, events = self.run_scanner([token, token], [(False, "HTTP 401"), (False, "HTTP 401")])
+        self.assertEqual(calls, [(token, "a"), (token, "b")])
+        self.assertFalse(app.scanning)
+        self.assertEqual(sum("HTTP 401" in message for _, message in logs), 2)
+        self.assertTrue(any(kind == "status" and "войдите заново" in value for kind, value in events))
+        self.assertIn(("scan", False), events)
+
     def test_cooldown_skips_qr(self):
         app, calls, _, _ = self.run_scanner(["ignored"] * 2, [], cooldown=True)
         self.assertEqual(calls, [])
