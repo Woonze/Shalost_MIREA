@@ -118,13 +118,12 @@ def log_path() -> Path:
 
 LOG_PATH = log_path()
 
-STATE_JS = """() => {
-  const settingsLinks = [...document.querySelectorAll('a[href*="/settings"]')];
-  const values = settingsLinks.map(x => (x.innerText || '').trim())
-    .filter(x => x && !/настройки|settings/i.test(x));
-  const namePattern = /^[А-ЯЁ][а-яё-]+(?:\\s+[А-ЯЁ][а-яё-]+)*\\s+[А-ЯЁ]\\.\\s*[А-ЯЁ]\\.?$/;
+STATE_JS = r"""() => {
+  // Ударения не должны мешать распознаванию имени, букву «ё» сохраняем.
+  const clean = value => value.normalize('NFD').replace(/\u0301/g, '').normalize('NFC').trim();
+  const namePattern = /^[\p{L}][\p{L}\p{M}'’\-]+(?:\s+[\p{L}][\p{L}\p{M}'’\-]+)*\s+[\p{L}]\.\s*[\p{L}]\.?$/u;
   const accountName = [...document.querySelectorAll('a, button, [role="button"]')]
-    .map(x => (x.innerText || '').trim())
+    .map(x => clean(x.innerText || ''))
     .find(x => namePattern.test(x)) || '';
   const pageText = document.body?.innerText || '';
   const hasLoginForm = [...document.querySelectorAll('input')].some(x =>
@@ -132,7 +131,7 @@ STATE_JS = """() => {
     /password|email|login|username/i.test(`${x.type} ${x.name} ${x.autocomplete}`)
   );
   const authenticatedUI = Boolean(accountName && pageText.includes('Мои занятия') && pageText.includes('Сервисы') && !hasLoginForm);
-  return {onPulse: location.hostname === 'pulse.mirea.ru', name: values.at(-1) || accountName, authenticatedUI};
+  return {onPulse: location.hostname === 'pulse.mirea.ru', name: accountName.split(/\s+/)[0], authenticatedUI};
 }"""
 
 
@@ -775,13 +774,10 @@ class App:
                 ctx = p.chromium.launch_persistent_context(str(self.account_path(account_id)), channel="chrome", headless=False)
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
                 page.goto(PULSE_HOME, wait_until="domcontentloaded", timeout=60000)
-                session_since = 0.0
                 for _ in range(600):
                     if self.stop.wait(1):
                         break
                     pages = [candidate for candidate in ctx.pages if not candidate.is_closed()]
-                    cookies = ctx.cookies(PULSE_HOME)
-                    cookie_auth = any(cookie["name"] == ".AspNetCore.Cookies" and cookie["value"] for cookie in cookies)
                     ui_auth = False
                     pulse_name = ""
                     for candidate in pages:
@@ -794,13 +790,7 @@ class App:
                         except PlaywrightError:
                             continue
 
-                    # Старый cookie может сохраниться после истечения сессии.
-                    authenticated = ui_auth if reconnect else (cookie_auth or ui_auth)
-                    if authenticated:
-                        if not session_since:
-                            session_since = time.monotonic()
-                        if time.monotonic() - session_since < 5:
-                            continue
+                    if ui_auth:
                         name = pulse_name or f"Аккаунт {len(self.accounts) + 1}"
                         ctx.close()
                         if not reconnect:
@@ -808,7 +798,6 @@ class App:
                         self.post("status", "Сессия активна")
                         self.log("AUTH", f"Вход завершён: {name}.")
                         return
-                    session_since = 0.0
                 ctx.close()
                 self.post("status", "Вход не подтверждён — откройте Pulse ещё раз")
                 self.log("AUTH", "Окно входа закрыто до подтверждения сессии")
